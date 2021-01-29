@@ -1,0 +1,7 @@
+{
+    "Enugu" : {"name" : "Enugu", "branches" : ["Uwani", "Abakpa"]},
+    "Rivers" : {"name" : "Rivers", "branches" : ["Port-Harcourt", "Okrika"]},
+    "Imo" : {"name" : "Imo", "branches" : ["Owerri"]},
+    "Lagos" : {"name" : "Lagos", "branches" : ["Apapa", "Area 1"]},
+    "Abuja" : {"name" : "Abuja", "branches" : ["Wuse 5", "Lugbe"]}
+}
