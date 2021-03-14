@@ -2,6 +2,7 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var webHandler = require('./handler');
 var hirWorker = require("./v1/apps/hir/workers/hir_woker");
+const cronJobs = require('./v1/crons/cron_jobs');
 
 var cors = require("cors");
 const path = require("path");
@@ -22,6 +23,7 @@ app.use((req, res, next)=>{
         next();
     else res.send({[req.params.action] : false, message : "Access denied"});
 })
+cronJobs();
 app.use("/loginImages", express.static(__dirname+"/Infrastructure/static_background"))
 app.use('/image', express.static(__dirname + '/files/media/images'));
 //server presentation "localhost:8080/web/agroblog/v1/:owner/:action"

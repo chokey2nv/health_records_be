@@ -5,6 +5,44 @@ module.exports = function(req, res){
     const {action} = req.params;
     console.log("ACTION", action);
     switch(action){
+        case "createClinicPatient" : 
+            return hirWorker.createClinicPatient(req.query, req.body, result => res.send(result));
+
+        case "revertRefund" : 
+            return hirWorker.revertRefund(req.query, result => res.send(result));
+        case "getRefunds" :
+            return hirWorker.getRefunds(req.query, req.body, result=>res.send(result));
+        case "getRefundMinMaxIds" :
+            return hirWorker.getRefundMinMaxIds(req.query, req.body, result=>res.send(result));
+        case "searchRefunds" :
+            return hirWorker.searchRefunds(req.query, req.body, result=>res.send(result));
+        case "getSearchRefundMinMaxIds" :
+            return hirWorker.getSearchRefundMinMaxIds(req.query, req.body, result=>res.send(result));
+        
+        case "refundCredit" : 
+            return hirWorker.refundCredit(req.query, req.body, result=>res.send(result));
+        case "getDebtHxs" :
+            return hirWorker.getDebtHxs(req.query, req.body, result=>res.send(result));
+        case "getDebtHxMinMaxIds" :
+            return hirWorker.getDebtHxMinMaxIds(req.query, req.body, result=>res.send(result));
+        case "searchDebtHxs" :
+            return hirWorker.searchDebtHxs(req.query, req.body, result=>res.send(result));
+        case "getSearchDebtHxMinMaxIds" :
+            return hirWorker.getSearchDebtHxMinMaxIds(req.query, req.body, result=>res.send(result));
+        
+        case "balanceOutDebt" :
+            return hirWorker.balanceOutDebt(req.query, result=>res.send(result));
+        case "getDebtors" :
+            return hirWorker.getDebtors(req.query, req.body, result=>res.send(result));
+        case "getDebtorMinMaxIds" :
+            return hirWorker.getDebtorMinMaxIds(req.query, req.body, result=>res.send(result));
+        case "searchDebtors" :
+            return hirWorker.searchDebtors(req.query, req.body, result=>res.send(result));
+        case "getSearchDebtorMinMaxIds" :
+            return hirWorker.getSearchDebtorMinMaxIds(req.query, req.body, result=>res.send(result));
+        
+        case "getDepositGroup" :
+            return hirWorker.getDepositGroup(req.query, req.body, result=>res.send(result));
         case "updateDeposit" :
             return hirWorker.updateDeposit(req.query, req.body, result=>res.send(result));
         case "deleteDeposit" :
@@ -84,10 +122,18 @@ module.exports = function(req, res){
             return hirWorker.searchPaymentsByDate(req.query, req.body, result=>res.send(result));
         case "getPaymentByUserIdAndDate" : 
             return hirWorker.getPaymentByUserIdAndDate(req.query, req.body, result=>res.send(result));
+        case "searchUserDepositsByDateRange" : 
+            return hirWorker.searchUserDepositsByDateRange(req.query, req.body, result=>res.send(result));
+        case "searchUserPaymentsByDateRange" : 
+            return hirWorker.searchUserPaymentsByDateRange(req.query, req.body, result=>res.send(result));
+        case "getUserDepositsByDate" : 
+            return hirWorker.getUserDepositsByDate(req.query, req.body,result=>res.send(result));
         case "getUserPaymentsByDate" : 
             return hirWorker.getUserPaymentsByDate(req.query, req.body,result=>res.send(result));
         case "getPaymentByRevenueTypeAndDate" : 
             return hirWorker.getPaymentByRevenueTypeAndDate(req.query, req.body, result=>res.send(result));
+        case "getRevenuePaymentsByDateRange" : 
+            return hirWorker.getRevenuePaymentsByDateRange(req.query, req.body, result=>res.send(result));
         case "getRevenuePaymentsByDate" : 
             return hirWorker.getRevenuePaymentsByDate(req.query, req.body, result=>res.send(result));
         case "getPayments" : 

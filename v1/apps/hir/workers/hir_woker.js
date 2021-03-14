@@ -4,11 +4,23 @@ const m_patients = require("../../../db_models/m_patients");
 const m_appointments = require("../../../db_models/m_appointments");
 const m_payments = require("../../../db_models/m_payments");
 const m_deposits = require("../../../db_models/m_deposits");
+const m_refunds = require("../../../db_models/m_refunds");
+const m_debt_hx = require("../../../db_models/m_debt_hx");
 const m_paymentgroup = require("../../../db_models/m_paymentGrops");
 const m_families = require("../../../db_models/m_families");
+const m_clinic_patients = require("../../../db_models/m_clinic_patients");
 const structure = require('../../../../Infrastructure/structure');
 const Utils = require("../../../../utils/Utils");
 const success = "Success!";
+const generalInfo = {
+    accountAction : {
+        useCredit : "useCredit",
+        addToDebt : "addToDebt",
+    }
+}
+const settingNames = {
+    CLINICS : 'clinics',
+}
 module.exports = class hirWorker {
     static async verifyToken(query, callback){
         const {userId, token } = query;
@@ -26,10 +38,284 @@ module.exports = class hirWorker {
         if(callback) callback(false);
         return false;
     }
+
+    async createClinicPatient(query, body, callback) {
+        const {userId} = query,
+        {data} = body;
+        try{
+            const {clinicName, patientId} = data || {};
+            if(!patientId || !clinicName) throw new Error("Invalid data presentation!");
+            const settings = await m_settings.getSettingsByNames([settingNames.CLINICS]),
+            clinicSetting = settings && settings[0];
+            if(!clinicSetting) throw new Errow("Clinic information has been added!")
+            const clinic = clinicSetting && clinicSetting.values && clinicSetting.values.find(i=>i.name === clinicName);
+            if(!clinic) throw new Error("Clinic not found!");
+            const lastNumber = await m_clinic_patients.lastClinicNumber({
+                clinicName
+            });
+            const {prefix} = clinic,
+            clinicData = {prefix, code : lastNumber + 1, clinicName};
+            await m_patients.updatePatientQuery(
+                {_id : patientId},
+                {$push : {
+                    clinics : clinicData
+                }}
+            );
+            const result = await m_clinic_patients.createClinicPatient(userId, {
+                ...clinicData, patientId
+            })
+            callback({createClinicPatient : true, result, message : success});
+        }catch(message){
+            console.error(message); 
+            callback({createClinicPatient : false, message : message.message || message});
+        }
+    }
+    async revertRefund(query, callback) {
+        const {userId, refundId} = query;
+        try{
+            const refunds = await m_refunds.getAllRefunds({_id : structure.db.ObjectId(refundId)}),
+            refund = refunds && refunds[0],
+            {credit, patientId} = refund || {};
+            await m_patients.updatePatientQuery(
+                {_id : patientId},
+                {$inc : {credit}}
+            );
+            const result = await m_refunds.deleteRefund(refundId);
+            callback({revertRefund : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({revertRefund : false, message : message.message || message});
+        }
+    }
+    async getRefunds(query, body, callback){
+        const {userId} = query;
+        const {filter, rows, skip, sort, max} = body;
+        try{
+            const result = await m_refunds.getRefunds(
+                {...filter}, rows, skip, sort, max);
+            callback({ getRefunds : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getRefunds : false, message});
+        }
+    }
+    async getRefundMinMaxIds(query, body, callback){
+        const {userId} = query;
+        const {filter, sort} = body;
+        try{
+            const result = {
+                minId : await m_refunds.getRefundMinMaxIds({...filter}, sort),
+                maxId : await m_refunds.getRefundMinMaxIds({...filter}, sort, true)
+            }
+            callback({ getRefundMinMaxIds : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getRefundMinMaxIds : false, message});
+        }
+    }
+    async searchRefunds(query, body, callback){
+        const {userId} = query;
+        const {filter, keyword, rows, skip, sort, max} = body;
+        try{
+            const result = await m_refunds.searchRefunds(
+                {...filter}, keyword, rows, skip, sort, max
+            );
+            callback({ searchRefunds : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({searchRefunds : false, message});
+        }
+    }
+    async getSearchRefundMinMaxIds(query, body, callback){
+        const {userId} = query;
+        const {filter, keyword, sort} = body;
+        try{
+            const result = {
+                minId : await m_refunds.getSearchRefundMinMaxIds(
+                    {...filter}, keyword, sort),
+                maxId : await m_refunds.getSearchRefundMinMaxIds(
+                    {...filter}, keyword, sort, true)
+            }
+            callback({ getSearchRefundMinMaxIds : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getSearchRefundMinMaxIds : false, message});
+        }
+    }
+
+
+
+    async getDebtHxs(query, body, callback){
+        const {userId} = query;
+        const {filter, rows, skip, sort, max} = body;
+        try{
+            const result = await m_debt_hx.getDebtHxs(
+                {...filter}, rows, skip, sort, max);
+            callback({ getDebtHxs : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getDebtHxs : false, message});
+        }
+    }
+    async getDebtHxMinMaxIds(query, body, callback){
+        const {userId} = query;
+        const {filter, sort} = body;
+        try{
+            const result = {
+                minId : await m_debt_hx.getDebtHxMinMaxIds({...filter}, sort),
+                maxId : await m_debt_hx.getDebtHxMinMaxIds({...filter}, sort, true)
+            }
+            callback({ getDebtHxMinMaxIds : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getDebtHxMinMaxIds : false, message});
+        }
+    }
+    async searchDebtHxs(query, body, callback){
+        const {userId} = query;
+        const {filter, keyword, rows, skip, sort, max} = body;
+        try{
+            const result = await m_debt_hx.searchDebtHxs(
+                {...filter}, keyword, rows, skip, sort, max
+            );
+            callback({ searchDebtHxs : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({searchDebtHxs : false, message});
+        }
+    }
+    async getSearchDebtHxMinMaxIds(query, body, callback){
+        const {userId} = query;
+        const {filter, keyword, sort} = body;
+        try{
+            const result = {
+                minId : await m_debt_hx.getSearchDebtHxMinMaxIds(
+                    {...filter}, keyword, sort),
+                maxId : await m_debt_hx.getSearchDebtHxMinMaxIds(
+                    {...filter}, keyword, sort, true)
+            }
+            callback({ getSearchDebtHxMinMaxIds : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getSearchDebtHxMinMaxIds : false, message});
+        }
+    }
+
+    async balanceOutDebt(query, callback){
+        const {userId} = query, patientId = parseInt(query.patientId);
+        try{
+            const patient = await m_patients.getAPatient(patientId);
+            if(!patient) throw new Error("No patient associated with this debt");
+            const {credit, debt} = patient;
+            if(!credit) throw new Error("Insufficient fund");
+            let result;
+            if(credit > debt) result = await m_patients.updatePatientQuery(
+                    {_id : patientId},
+                    {
+                        $set : {credit : credit - debt},
+                        $unset : {debt : true}
+                    }
+                );
+            else result = await m_patients.updatePatientQuery(
+                {_id : patientId},
+                {
+                    $set : {debt : debt - credit},
+                    $unset : {credit : true}
+                }
+            );
+            await m_debt_hx.createDebtHx(userId, {patientId, debt, actionDate : new Date()});
+            callback({ balanceOutDebt : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({balanceOutDebt : false, message : message.message || message});
+        }
+    }
+    async getDebtors(query, body, callback){
+        const {userId} = query;
+        const {filter, rows, skip, sort, max} = body;
+        try{
+            const result = await m_patients.getDebtors(
+                filter, rows, skip, sort, max);
+            callback({ getDebtors : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getDebtors : false, message});
+        }
+    }
+    async getDebtorMinMaxIds(query, body, callback){
+        const {userId} = query;
+        const {filter, sort} = body;
+        try{
+            const result = {
+                minId : await m_patients.getDebtorMinMaxIds(filter, sort),
+                maxId : await m_patients.getDebtorMinMaxIds(filter, sort, true)
+            }
+            callback({ getDebtorMinMaxIds : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getDebtorMinMaxIds : false, message});
+        }
+    }
+    async searchDebtors(query, body, callback){
+        const {userId} = query;
+        const {filter, keyword, rows, skip, sort, max} = body;
+        try{
+            const result = await m_patients.searchDebtors(
+                filter, keyword, rows, skip, sort, max
+            );
+            callback({ searchDebtors : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({searchDebtors : false, message});
+        }
+    }
+    async getSearchDebtorMinMaxIds(query, body, callback){
+        const {userId} = query;
+        const {filter, keyword, sort} = body;
+        try{
+            const result = {
+                minId : await m_patients.getSearchDebtorMinMaxIds(
+                    filter, keyword, sort),
+                maxId : await m_patients.getSearchDebtorMinMaxIds(
+                    filter, keyword, sort, true)
+            }
+            callback({ getSearchDebtorMinMaxIds : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getSearchDebtorMinMaxIds : false, message});
+        }
+    }
+    async getDepositGroup(query, body, callback) {
+        const {userId} = query,
+        {filter, group} = body;
+        try {
+            const result = await m_deposits.getDepositGroup(filter, group);
+            callback({getDepositGroup : true, result, message : success});
+        }catch(message) {
+            callback({getDepositGroup :false, message : message.message || message});
+        }
+    }
     async updateDeposit(query, body, callback){
         const {userId} = query,
         {depositId, data} = body
         try{
+            const deposits = await m_deposits.getAllDeposits({_id : structure.db.ObjectId(depositId)}),
+            deposit = deposits && deposits[0];
+            if(!deposit) throw new Error("Deposit desn't exist!");
+            const {amount : oldAmount, patientId} = deposit,
+            patient = await m_patients.getAPatient(patientId);
+            if(!patient) throw new Error("Deposit is not associated with any patient!");
+            const {credit} = patient,
+            {amount : newAmount} = data || {};
+            if(newAmount < oldAmount){
+                const diffAmount = oldAmount - newAmount;
+                if(credit < diffAmount)
+                    throw new Error("Part of this deposit has been used, and can't be reduced to such an amount!")
+            }
+            await m_patients.updatePatientQuery(
+                {_id : patientId},
+                {$inc : {credit : newAmount - oldAmount}}
+            )
             data.actionDate = new Date(data.actionDate ? 
                 data.actionDate :
                 Utils.getThisDate()
@@ -41,17 +327,45 @@ module.exports = class hirWorker {
             callback({updateDeposit : true, result, message : success});
         }catch(message){
             console.error(message);
-            callback({updateDeposit : false, message})
+            callback({updateDeposit : false, message : message.message || message})
+        }
+    }
+    async refundCredit(query, body, callback){
+        const {userId} = query,
+        {data} = body,
+        {patientId, credit} = data || {};
+        try{
+            const result = await m_patients.updatePatientQuery(
+                {_id : patientId},
+                {$inc : {credit : -credit}}
+            );
+            await m_refunds.createRefund(userId, data);
+            callback({refundCredit : true, result, message : success});
+        }catch(message) {
+            console.error(message);
+            callback({refundCredit : false, message : message.message || message});
         }
     }
     async deleteDeposit(query, callback){
         const {userId, depositId} = query;
         try{
+            const deposits = await m_deposits.getAllDeposits({_id : structure.db.ObjectId(depositId)}),
+            deposit = deposits && deposits[0],
+            {amount, patientId} = deposit || {},
+            patient = await m_patients.getAPatient(patientId),
+            {credit} = patient || {};
+            if(!deposit) throw new Error("Deposit not found!");
+            else if (!patient) throw new Error("Patient not found!");
+            else if(amount > credit) throw new Error("Sorry you can't delete this deposit, it has been used or refunded!")
+            await m_patients.updatePatientQuery(
+                {_id : patientId},
+                {$inc : {credit : -amount}}
+            );
             const result = await m_deposits.deleteDeposit(depositId);
             callback({deleteDeposit : true, result, message : success});
         }catch(message){
             console.error(message);
-            callback({deleteDeposit : false, message})
+            callback({deleteDeposit : false, message : message.message || message})
         }
     }
     async getDeposits(query, body, callback){
@@ -118,7 +432,7 @@ module.exports = class hirWorker {
             if(patientId)await m_patients.updatePatientQuery(
                 {_id : patientId},
                 {$inc : {credit : data.amount}}
-            )
+            );
             callback({createDeposit : true, result, message : success});
         }catch({message}){
             console.error(message);
@@ -330,17 +644,49 @@ module.exports = class hirWorker {
         const {paymentId, data} = body;
         data.actionDate = new Date(data.actionDate);
         try{
+            const payment = await m_payments.getAPayment(paymentId);
+            if(!payment) throw new Error("Payment not found!");
+            const {accountAction, amount : oldAmount, patientId} = payment,
+            patient = await m_patients.getAPatient(patientId);
+            if(!patient) throw new Error("No patient is associated with this payment!");
+            const {credit} = patient || {};
+            if(accountAction){
+                if(accountAction === generalInfo.accountAction.useCredit){
+                    //if increased payment --- know if credit is enough to handle it
+                    if(data.amount > oldAmount){
+                        const diffAmount = data.amount - oldAmount;
+                        //check if the balance is available
+                        if(credit < diffAmount)
+                            throw new Error("Patient don't have enough credit/deposit for this increment!")
+                    }
+                    await m_patients.updatePatientQuery(
+                        {_id : patientId},
+                        {$inc : {credit : oldAmount - data.amount}}
+                    );
+                }
+            }
             await m_payments.updatePayment(paymentId, data);
             const result = await m_payments.getAPayment(paymentId);
             callback({updatePayment : true, result, message : success});
         }catch(message){
             console.error(message);
-            callback({updatePayment : false, message});
+            callback({updatePayment : false, message : message.message || message});
         }
     }
     async deletePayment(query, callback){
         const {paymentId, groupId} = query;
         try{
+            const payment = await m_payments.getAPayment(paymentId);
+            if(!payment) throw new Error("Payment not found!");
+            const {accountAction, amount, patientId} = payment;
+            if(accountAction){
+                if(accountAction === generalInfo.accountAction.useCredit){
+                    await m_patients.updatePatientQuery(
+                        {_id : patientId},
+                        {$inc : {credit : amount}}
+                    );
+                }
+            }
             if(groupId !== 'undefined' && groupId !== "null"){
                 await m_paymentgroup.deletePaymentFromGroup(groupId, paymentId);
                 const group = await m_paymentgroup.getPaymentGroup(groupId);
@@ -485,12 +831,46 @@ module.exports = class hirWorker {
         const {year, month, day, userId} = body;
         try{
             const result = await m_payments.getPaymentByUserIdAndDate(
-                userId, year, month, day
+                body
             );
             callback({getPaymentByUserIdAndDate : true, result, message : success})
         }catch(message){
             console.error(message);
             callback({getPaymentByUserIdAndDate : false, message});
+        }
+    }
+    async searchUserDepositsByDateRange(query, body, callback){
+        const {startDate, endDate, filter} = body;
+        try{
+            const result = await m_deposits.getUserDepositsByDateRange(
+                startDate, endDate, filter
+            );
+            callback({searchUserDepositsByDateRange : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({searchUserDepositsByDateRange : false, message});
+        }
+    }
+    async searchUserPaymentsByDateRange(query, body, callback){
+        const {startDate, endDate, filter} = body;
+        try{
+            const result = await m_payments.getUserPaymentsByDateRange(
+                startDate, endDate, filter
+            );
+            callback({searchUserPaymentsByDateRange : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({searchUserPaymentsByDateRange : false, message});
+        }
+    }
+    async getUserDepositsByDate(query, body, callback){
+        const {year, month, day} = body;
+        try{            
+            const result = await m_deposits.getUserDepositsByDate(year, month, day);
+            callback({getUserDepositsByDate : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getUserDepositsByDate : false, message});
         }
     }
     async getUserPaymentsByDate(query, body, callback){
@@ -507,12 +887,24 @@ module.exports = class hirWorker {
         const {year, month, day, revenueName} = body;
         try{
             const result = await m_payments.getPaymentByRevenueTypeAndDate(
-                revenueName, year, month, day
+                body
             );
             callback({getPaymentByRevenueTypeAndDate : true, result, message : success})
         }catch(message){
             console.error(message);
             callback({getPaymentByRevenueTypeAndDate : false, message});
+        }
+    }
+    async getRevenuePaymentsByDateRange(query, body, callback){
+        const {startDate, endDate, filter} = body;
+        try{
+            const result = await m_payments.getRevenuePaymentsByDateRange(
+                startDate, endDate, filter
+            );
+            callback({getRevenuePaymentsByDateRange : true, result, message : success});
+        }catch(message){
+            console.error(message);
+            callback({getRevenuePaymentsByDateRange : false, message});
         }
     }
     async getRevenuePaymentsByDate(query, body, callback){
@@ -560,7 +952,23 @@ module.exports = class hirWorker {
         const {userId} = query;
         const {patientId, data} = body;
         try{
-            const patient = await m_patients.getAPatient(patientId);
+            if(data.accountAction){
+                const patient = await m_patients.getAPatient(patientId);
+                if(!patient) throw new Error("This patient could not be found, please select a patient");
+                const {credit} = patient;            
+                if(data.accountAction === generalInfo.accountAction.useCredit){
+                    if(data.amount > credit) throw new Error("Insufficient credit!");
+                    await m_patients.updatePatientQuery(
+                        {_id : patientId},
+                        {$inc : {credit : -data.amount}}
+                    )
+                }else if(data.accountAction === generalInfo.accountAction.addToDebt){
+                    await m_patients.updatePatientQuery(
+                        {_id : patientId},
+                        {$inc : {debt : data.amount}},
+                    );
+                }
+            }
             if(data.paymentList){
                 let paymentIds = [], totalAmount = 0;
                 let storedPayment;
@@ -568,7 +976,9 @@ module.exports = class hirWorker {
                     const payment = data.paymentList[i];
                     totalAmount += payment.amount;
                     if(data.actionDate) payment.actionDate = data.actionDate;
-                    storedPayment = await m_payments.postPayment(userId, {...payment, patientId});
+                    const paymentData = {...payment, patientId};
+                    if(data.accountAction) paymentData.accountAction = data.accountAction;
+                    storedPayment = await m_payments.postPayment(userId, paymentData);
                     paymentIds.push(storedPayment._id);
                 }
                 const storedGroup = await m_paymentgroup.createPaymentGroup({paymentIds, totalAmount});
@@ -576,66 +986,73 @@ module.exports = class hirWorker {
                 storedPayment.groupId = storedGroup._id;
                 callback({postPayment : true, paymentIds, result : storedPayment, storedGroup, message : success});
             }else{
-                if(data.accountAction){
-                    if(accountAction === "useCredit"){
-                        await m_patients.updatePatientQuery(
-                            {_id : patientId},
-                            {$set : {$inc : -data.amount}}
-                        )
-                    }
-                }
                 const result = await m_payments.postPayment(userId, {...data, patientId});
                 callback({postPayment : true, result, message : success});
             }
         }catch(message){
             console.error(message);
-            callback({postPayment : false, message});
+            callback({postPayment : false, message : message.message || message});
         }
     }
     /** SETTINGS */
     async editSettingValue(query, body, callback) {
-        let {settingId, valueName, value} = body;
+        let {settingId, valueName, data} = body;
         try{
-            await m_settings.editSettingValue(settingId, valueName, value);
+            await m_settings.editSettingValue(settingId, valueName, data);
             const result = await m_settings.getSettings();
             callback({editSettingValue : true, result, message : success});
         }catch(message){
             console.error(message);
-            callback({editSettingValue : false, message});
+            callback({editSettingValue : false, message : message.message || message});
         }
     }
     async deleteSettingValue(query, callback){
         let {settingId, valueName} = query;
         try{
+            const settings = await m_settings.getSettings({
+                _id : structure.db.ObjectId(settingId)
+            }),
+            setting = settings && settings[0];
+            if(!setting) throw new Error('Setting not found!');
+            const {name} = setting;
+            if(settingNames.CLINICS === name){
+                const clinicPatients = await m_clinic_patients.getAllClinicPatients({
+                    clinicName : valueName
+                });
+                if(clinicPatients && clinicPatients.length > 0){
+                    throw new Error("Patients already enrolled in this unit. Can not be deleted")
+                }
+            }
             await m_settings.deleteSettingValue(settingId, valueName);
             const result = await m_settings.getSettings();
             callback({deleteSettingValue : true, result, message : success});
         }catch(message){
             console.error(message);
-            callback({deleteSettingValue : false, message});
+            callback({deleteSettingValue : false, message : message.message || message});
         }
 
     }
     async addSettingValue(query, body, callback){
-        let {settingId, settingName, value} = body;
+        let {settingId, settingName, data} = body;
         try{
+            if(!data.value) throw new Error("Value is not defined")
             await m_settings.addSettingValue(
                 settingId, 
                 { 
-                    name : String(value).toLowerCase().split(" ").join(""),
-                    value
+                    name : String(data.value).toLowerCase().split(" ").join(""),
+                    ...data
                 }
             );
             const result = await m_settings.getSettings();
             callback({addSettingValue : true, result, message : success});
         }catch(message){
             console.error(message);
-            callback({addSettingValue : false, message});
+            callback({addSettingValue : false, message : message.message || message});
         }
     }
     async getSettings(query, callback){
         try{
-            let result = await m_settings.getSettingsByNames(["units", "revenue"]);
+            let result = await m_settings.getSettingsByNames(["units", "revenue", "clinics"]);
             if(!result || result.length === 0){
                 result = await m_settings.createSettings([
                     {
@@ -646,8 +1063,19 @@ module.exports = class hirWorker {
                         name : "revenue",
                         header : "Revenue Categories",
                         values : []
+                    },{
+                        name : "clinics",
+                        header : "Clinics",
+                        values : [],
                     }
                 ])
+            }else if(!result.find(item=>item.name === "clinics")){
+                await m_settings.createSettings([{
+                    name : "clinics",
+                    header : "Clinics",
+                    values : [],
+                }]);
+                result = await m_settings.getSettingsByNames(["units", "revenue", "clinics"]);
             }
             callback({getSettings : true, result, message : success});
         }catch(message){

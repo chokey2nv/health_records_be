@@ -60,7 +60,7 @@ module.exports = class settings {
             })
         })
     }
-    static editSettingValue(settingId, valueName, value, callback){
+    static editSettingValue(settingId, valueName, data, callback){
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
                 const response = (err, result)=>{
@@ -75,12 +75,19 @@ module.exports = class settings {
                         if(callback) callback(err, result.result);
                     }
                 }
+                const newData = {}
+                if(data) for (const name in data) {
+                    if (Object.hasOwnProperty.call(data, name)) {
+                        const value = data[name];
+                        newData["values.$."+name] = value;
+                    }
+                }
                 if(valueName) client.collection(this.name).updateOne(
                     {
                         _id : structure.db.ObjectId(settingId),
                         values : {$elemMatch : {name : valueName}}
                     },
-                    {$set : {"values.$.value" : value}},
+                    {$set : newData},
                     {upsert : true},
                     response
                 ); else client.collection(this.name).updateOne(
@@ -139,10 +146,10 @@ module.exports = class settings {
             })
         })
     }
-    static getSettings(callback){
+    static getSettings(filter={}, callback){
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
-                client.collection(this.name).find().toArray((err, result)=>{
+                client.collection(this.name).find(filter).toArray((err, result)=>{
                     if(err){
                         rej(err);
                         const error = errMsg + "getSettings";

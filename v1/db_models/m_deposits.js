@@ -5,6 +5,159 @@ const myUtils = require("../../utils/Utils");
 const Utils = require("../../utils/Utils");
 let errMsg = "DB Error! ";
 module.exports = class deposits {
+    static getDepositGroup(filter, group, callback) {
+        return new Promise((resolve, reject) => {
+            structure.db.hms((client, res, rej)=>{
+                const {startDate, endDate, date, ..._filter} = filter;
+                let match = {..._filter};
+                if(startDate){
+                    if(!startDate) throw("No start date found");
+                    else if(!endDate) throw("No end date fount");
+                    match = {
+                        ...filter, $and : [
+                        {actionDate : {$gte : myUtils.getStandardFromLocale(new Date(startDate).toLocaleDateString())} }, 
+                        {actionDate : {$lte : myUtils.getStandardFromLocale(new Date(endDate).toLocaleDateString())} }, 
+                    ]}
+                }else if(date){
+                    const _date = new Date(date);
+                    match = {
+                        ...match,
+                        year : _date.getFullYear(), 
+                    };
+                    if(!match.yearOnly){
+                        match.month = _date.getMonth() + 1;
+                        if(!match.monthOnly) match.day = _date.getDate();
+                    }
+                    delete match.monthOnly; delete match.yearOnly;
+                }
+                console.log(match);
+                const collection = client.collection(this.name);
+                collection.aggregate([ 
+                    {
+                        $addFields : {
+                            year : {$year : "$actionDate"},
+                            month : {$month : "$actionDate"},
+                            day : {$dayOfMonth : "$actionDate"},
+                        },
+                    },{
+                        $match : match
+                    },
+                    { 
+                        $group :  group ? group :
+                        { 
+                            _id : null, 
+                            amount : {$sum : "$amount"}, 
+                        } 
+                    }
+                ]).toArray((err, result)=>{
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "getDepositGroup";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
+            })
+        })
+    }
+    static getUserDepositsByDateRange(startDate, endDate, filter={}, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                if(!startDate) throw("No start date found");
+                else if(!endDate) throw("No end date fount");
+                const match = {
+                    ...filter, $and : [
+                    {actionDate : {$gte : myUtils.getStandardFromLocale(new Date(startDate).toLocaleDateString())} }, 
+                    {actionDate : {$lte : myUtils.getStandardFromLocale(new Date(endDate).toLocaleDateString())} }, 
+                ]}
+                const collection = client.collection(this.name);
+                collection.aggregate([ 
+                    {
+                        $addFields : {
+                            year : {$year : "$actionDate"},
+                            month : {$month : "$actionDate"},
+                            day : {$dayOfMonth : "$actionDate"},
+                        },
+                    },{
+                        $lookup : {
+                            from : m_users.name,
+                            localField : "by",
+                            foreignField : "_id",
+                            as : "user"
+                        }
+                    },{
+                        $match : match
+                    },
+                    { 
+                        $group :  
+                        { 
+                            _id : "$user", 
+                            total : {$sum : "$amount"}, 
+                        } 
+                    }
+                ]).toArray((err, result)=>{  console.log(result);
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "getUserDepositsByDateRange";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
+            })
+        })
+    }
+    static getUserDepositsByDate(year, month, day, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                const match = {year, month};
+                if(day) match.day = day;
+                client.collection(this.name).aggregate([ 
+                    {
+                        $addFields : {
+                            year : {$year : "$actionDate"}, 
+                            month : {$month : "$actionDate"},
+                            day : {$dayOfMonth : "$actionDate"}
+                        }
+                    },{
+                        $lookup : {
+                            from : m_users.name,
+                            localField : "by",
+                            foreignField : "_id",
+                            as : "user"
+                        }
+                    },{
+                        $match : match
+                    },
+                    { 
+                        $group :  
+                        { 
+                            _id : "$user", 
+                            total : {$sum : "$amount"}, 
+                        } 
+                    }
+                ]).toArray((err, result)=>{ 
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "getUserDepositsByDate";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
+            })
+        })
+    }
     static deleteDeposit(depositId, callback){
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
@@ -23,6 +176,26 @@ module.exports = class deposits {
                         }
                     }
                 );
+            });
+        })
+    }
+    static getAllDeposits(filter, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                client.collection(this.name).aggregate(
+                    this.getDepositAggregateArray(filter)
+                ).toArray((err, result)=>{
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "getAllDeposits";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
             });
         })
     }

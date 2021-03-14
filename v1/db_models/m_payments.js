@@ -2,10 +2,10 @@ const structure = require("../../Infrastructure/structure");
 const m_patients = require("./m_patients")
 const m_users = require("./m_users");
 const myUtils = require("../../utils/Utils");
+const Utils = require("../../utils/Utils");
 let errMsg = "DB Error! ";
 module.exports = class payments {
     static getMultiplePatientYearlyPayments(patientIds, year, callback){ 
-        console.log(patientIds, year)
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
                 const collection = client.collection(this.name);
@@ -159,9 +159,7 @@ module.exports = class payments {
                 }
                 collection.aggregate([
                     {
-                        $project : {
-                            _id : 1, 
-                            amount : 1,
+                        $addFields : {
                             year : {$year : "$actionDate"},
                             month : {$month : "$actionDate"},
                             day : {$dayOfMonth : "$actionDate"}
@@ -170,7 +168,7 @@ module.exports = class payments {
                         $match : {year, month, day}
                     },{
                         $group : {
-                            _id : {year : "$year", month : "$month", day : "$day"},
+                            _id : {accountAction : "$accountAction", year : "$year", month : "$month", day : "$day"},
                             amount : {$sum : "$amount"}
                         }
                     }
@@ -196,9 +194,7 @@ module.exports = class payments {
                 }
                 collection.aggregate([
                     {
-                        $project : {
-                            _id : 1, 
-                            amount : 1,
+                        $addFields : {
                             year : {$year : "$actionDate"},
                             month : {$month : "$actionDate"}
                         }
@@ -206,7 +202,7 @@ module.exports = class payments {
                         $match : {year, month}
                     },{
                         $group : {
-                            _id : {year : "$year", month : "$month"},
+                            _id : {accountAction : "$accountAction", year : "$year", month : "$month"},
                             amount : {$sum : "$amount"}
                         }
                     }
@@ -232,16 +228,14 @@ module.exports = class payments {
                 }
                 collection.aggregate([
                     {
-                        $project : {
-                            _id : 1, 
-                            amount : 1,
+                        $addFields : {
                             year : {$year : "$actionDate"},
                         }
                     },{
                         $match : {year}
                     },{
                         $group : {
-                            _id : "$year",
+                            _id :  {accountAction : "$accountAction", year : "$year"},
                             amount : {$sum : "$amount"}
                         }
                     }
@@ -267,9 +261,7 @@ module.exports = class payments {
                 }
                 collection.aggregate([
                     {
-                        $project : {
-                            _id : 1, 
-                            amount : 1,
+                        $addFields : {
                             year : {$year : "$actionDate"},
                             month : {$month : "$actionDate"}
                         }
@@ -277,7 +269,7 @@ module.exports = class payments {
                         $match : {year}
                     },{
                         $group : {
-                            _id : {year : "$year", month : "$month"},
+                            _id : {accountAction : "$accountAction", year : "$year", month : "$month"},
                             amount : {$sum : "$amount"}
                         }
                     }
@@ -303,9 +295,7 @@ module.exports = class payments {
                 }
                 collection.aggregate([
                     {
-                        $project : {
-                            _id : 1, 
-                            amount : 1,
+                        $addFields : {
                             year : {$year : "$actionDate"},
                             month : {$month : "$actionDate"},
                             day : {$dayOfMonth : "$actionDate"},
@@ -314,7 +304,7 @@ module.exports = class payments {
                         $match : {year, month}
                     },{
                         $group : {
-                            _id : {year : "$year", month : "$month", day : "$day"},
+                            _id : {accountAction : "$accountAction", year : "$year", month : "$month", day : "$day"},
                             amount : {$sum : "$amount"}
                         }
                     }
@@ -356,6 +346,7 @@ module.exports = class payments {
                                 _id : 1, 
                                 name : {$concat : ["$patient.myProfile.firstName", " ", "$patient.myProfile.lastName"]},
                                 amount : 1, revenueType : 1, groupId : 1,  patientId : 1, by : 1, actionDate : 1,
+                                accountAction : 1,
                                 staff : {$concat : ["$staff.myProfile.firstName", " ", "$staff.myProfile.lastName"]},
                             }
                         },{
@@ -379,6 +370,7 @@ module.exports = class payments {
                                 _id : 1,
                                 name : {$concat : ["$patient.myProfile.firstName", " ", "$patient.myProfile.lastName"]},
                                 amount : 1, revenueType : 1, groupId : 1, patientId : 1, by : 1, actionDate : 1,
+                                accountAction : 1,
                                 staff : {$concat : ["$staff.myProfile.firstName", " ", "$staff.myProfile.lastName"]},
                             }
                         },{
@@ -448,6 +440,7 @@ module.exports = class payments {
                             _id : 1,
                             name : {$concat : ["$patient.myProfile.firstName", " ", "$patient.myProfile.lastName"]},
                             amount : 1, revenueType : 1, groupId : 1, patientId : 1, by : 1, actionDate : 1, description : 1,
+                            accountAction : 1,
                             staff : {$concat : ["$staff.myProfile.firstName", " ", "$staff.myProfile.lastName"]},
                         }
                     },{
@@ -493,6 +486,7 @@ module.exports = class payments {
                             _id : 1,
                             name : {$concat : ["$patient.myProfile.firstName", " ", "$patient.myProfile.lastName"]},
                             amount : 1, revenueType : 1, groupId : 1, patientId : 1, by : 1, actionDate : 1, description : 1,
+                            accountAction : 1,
                             staff : {$concat : ["$staff.myProfile.firstName", " ", "$staff.myProfile.lastName"]},
                             year : {$year : "$actionDate"},
                             month : {$month : "$actionDate"},
@@ -506,21 +500,35 @@ module.exports = class payments {
             });
         });
     }
-    static getPaymentByUserIdAndDate(by, year, month, day, callback){
+    /**
+     * if(match.startDate){
+            match = {
+                ...match, $and : [
+                {date : {$gte : Utils.getStandardFromLocale(new Date(match.startDate).toLocaleDateString())} }, 
+                {date : {$lte : Utils.getStandardFromLocale(new Date(match.endDate).toLocaleDateString())} }, 
+            ]}
+            delete match.startDate; delete match.endDate;
+        }
+     */
+    static getPaymentByUserIdAndDate(data, callback){
+        const {userId : by, year, month, day, startDate, endDate} = data;
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
-                const match = {year, month, by};
-                if(day) match.day = day;
+                let match = {by};
+                if(startDate){
+                    match = {
+                        ...match, $and : [
+                        {actionDate : {$gte : Utils.getStandardFromLocale(new Date(startDate).toLocaleDateString())} }, 
+                        {actionDate : {$lte : Utils.getStandardFromLocale(new Date(endDate).toLocaleDateString())} }, 
+                    ]}
+                    delete match.startDate; delete match.endDate;
+                }else{
+                    match = {year, month, by};
+                    if(day) match.day = day;
+                }
                 client.collection(this.name).aggregate([ 
                     {
-                        $project :{
-                            _id : 1,
-                            revenueType : 1, groupId : 1,
-                            by : 1,
-                            amount : 1, 
-                            patientId : 1,
-                            actionDate : 1,
-                            description : 1,
+                        $addFields :{
                             year : {$year : "$actionDate"}, 
                             month : {$month : "$actionDate"},
                             day : {$dayOfMonth : "$actionDate"}
@@ -550,6 +558,61 @@ module.exports = class payments {
             });
         });
     }
+    static getUserPaymentsByDateRange(startDate, endDate, filter={}, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                if(!startDate) throw("No start date found");
+                else if(!endDate) throw("No end date fount");
+                const match = {
+                    ...filter, $and : [
+                    {actionDate : {$gte : myUtils.getStandardFromLocale(new Date(startDate).toLocaleDateString())} }, 
+                    {actionDate : {$lte : myUtils.getStandardFromLocale(new Date(endDate).toLocaleDateString())} }, 
+                ]}
+                const collection = client.collection(this.name);
+                collection.aggregate([ 
+                    {
+                        $addFields : {
+                            year : {$year : "$actionDate"},
+                            month : {$month : "$actionDate"},
+                            day : {$dayOfMonth : "$actionDate"},
+                        },
+                    },{
+                        $lookup : {
+                            from : m_users.name,
+                            localField : "by",
+                            foreignField : "_id",
+                            as : "user"
+                        }
+                    },{
+                        $unwind : {
+                            path : "$user",
+                            preserveNullAndEmptyArrays : true
+                        }
+                    },{
+                        $match : match
+                    },
+                    { 
+                        $group :  
+                        { 
+                            _id : {user : "$user", accountAction : "$accountAction"}, 
+                            total : {$sum : "$amount"}, 
+                        } 
+                    }
+                ]).toArray((err, result)=>{
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "getUserPaymentsByDateRange";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
+            })
+        })
+    }
     static getUserPaymentsByDate(year, month, day, callback){
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
@@ -557,11 +620,8 @@ module.exports = class payments {
                 if(day) match.day = day;
                 client.collection(this.name).aggregate([ 
                     {
-                        $project : 
+                        $addFields : 
                         {
-                            revenueType : 1, groupId : 1,
-                            amount : 1,
-                            by : 1,
                             year : {$year : "$actionDate"}, 
                             month : {$month : "$actionDate"},
                             day : {$dayOfMonth : "$actionDate"}
@@ -574,12 +634,17 @@ module.exports = class payments {
                             as : "user"
                         }
                     },{
+                        $unwind : {
+                            path : "$user",
+                            preserveNullAndEmptyArrays : true
+                        }
+                    },{
                         $match : match
                     },
                     { 
                         $group :  
                         { 
-                            _id : "$user", 
+                            _id : {accountAction : "$accountAction", user : "$user"}, 
                             total : {$sum : "$amount"}, 
                         } 
                     }
@@ -598,21 +663,25 @@ module.exports = class payments {
             })
         })
     }
-    static getPaymentByRevenueTypeAndDate(revenueType, year, month, day, callback){
+    static getPaymentByRevenueTypeAndDate(data, callback){
+        const {revenueName : revenueType, year, month, day, startDate, endDate} = data;
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
-                const match = {year, month, revenueType};
-                if(day) match.day = day;
+                let match = {revenueType};
+                if(startDate){
+                    match = {
+                        ...match, $and : [
+                        {actionDate : {$gte : Utils.getStandardFromLocale(new Date(startDate).toLocaleDateString())} }, 
+                        {actionDate : {$lte : Utils.getStandardFromLocale(new Date(endDate).toLocaleDateString())} }, 
+                    ]}
+                    delete match.startDate; delete match.endDate;
+                }else {
+                    match = {...match, year, month, revenueType};
+                    if(day) match.day = day;
+                }
                 client.collection(this.name).aggregate([ 
                     {
-                        $project :{
-                            _id : 1,
-                            revenueType : 1, groupId : 1,
-                            by : 1,
-                            amount : 1, 
-                            patientId : 1,
-                            actionDate : 1,
-                            description : 1,
+                        $addFields :{
                             year : {$year : "$actionDate"}, 
                             month : {$month : "$actionDate"},
                             day : {$dayOfMonth : "$actionDate"}
@@ -642,6 +711,50 @@ module.exports = class payments {
             });
         });
     }
+    static getRevenuePaymentsByDateRange(startDate, endDate, filter={}, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                if(!startDate) throw("No start date found");
+                else if(!endDate) throw("No end date fount");
+                const match = {
+                    ...filter, $and : [
+                    {actionDate : {$gte : myUtils.getStandardFromLocale(new Date(startDate).toLocaleDateString())} }, 
+                    {actionDate : {$lte : myUtils.getStandardFromLocale(new Date(endDate).toLocaleDateString())} }, 
+                ]}
+                const collection = client.collection(this.name);
+                collection.aggregate([ 
+                    {
+                        $addFields : {
+                            year : {$year : "$actionDate"},
+                            month : {$month : "$actionDate"},
+                            day : {$dayOfMonth : "$actionDate"},
+                        },
+                    }, 
+                    {
+                        $match : match
+                    },
+                    { 
+                        $group :  
+                        { 
+                            _id : {revenueType : "$revenueType", accountAction : "$accountAction"},
+                            total : {$sum : "$amount"}, 
+                        } 
+                    }
+                ]).toArray((err, result)=>{
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "getRevenuePaymentsByDateRange";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
+            })
+        })
+    }
     static getRevenuePaymentsByDate(year, month, day, callback){
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
@@ -652,7 +765,7 @@ module.exports = class payments {
                         $project : 
                         {
                             revenueType : 1, groupId : 1,
-                            amount : 1, 
+                            amount : 1, accountAction : "$accountAction",
                             year : {$year : "$actionDate"}, 
                             month : {$month : "$actionDate"},
                             day : {$dayOfMonth : "$actionDate"}
@@ -664,7 +777,7 @@ module.exports = class payments {
                     { 
                         $group :  
                         { 
-                            _id : "$revenueType", 
+                            _id : {revenueType :"$revenueType", accountAction : "$accountAction" }, 
                             total : {$sum : "$amount"}, 
                         } 
                     }
@@ -717,6 +830,7 @@ module.exports = class payments {
                                 _id : 1,
                                 name : {$concat : ["$patient.myProfile.firstName", " ", "$patient.myProfile.lastName"]},
                                 amount : 1, revenueType: 1, groupId : 1, patientId : 1, by : 1, actionDate : 1, description : 1,
+                                accountAction : 1,
                                 staff : {$concat : ["$staff.myProfile.firstName", " ", "$staff.myProfile.lastName"]},
                             }
                         }
@@ -737,6 +851,7 @@ module.exports = class payments {
                                 _id : 1,
                                 name : {$concat : ["$patient.myProfile.firstName", " ", "$patient.myProfile.lastName"]},
                                 amount : 1, revenueType : 1, groupId : 1, patientId : 1, by : 1, actionDate : 1, description : 1,
+                                accountAction : 1,
                                 staff : {$concat : ["$staff.myProfile.firstName", " ", "$staff.myProfile.lastName"]},
                             }
                         }

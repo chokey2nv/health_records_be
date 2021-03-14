@@ -1,6 +1,131 @@
 const structure = require("../../Infrastructure/structure");
+const settings = require("./m_settings");
 let errMsg = "DB Error! ";
 module.exports = class patients {
+    static getDebtors(filter, rows, skip, sort, max, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                client.collection(this.name).aggregate(
+                    this.getDebtorAggregateArray(filter)
+                ).sort(sort ? {[sort] : max ? -1 : 1} : {_id : -1}).
+                skip(skip).limit(rows).toArray((err, result)=>{
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "getDebtors";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
+            });
+        })
+    }
+    static getDebtorMinMaxIds(filter, sort, max, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                client.collection(this.name).aggregate(
+                    this.getDebtorAggregateArray(filter)
+                ).sort(sort ? {[sort] : max ? -1 : 1 } : {_id: max ? -1 : 1})
+                .limit(1).toArray((err, result)=>{
+                    if(err) {
+                        rej(err)
+                        const error = errMsg + "getDebtorMinMaxIds";
+                        reject(error);
+                        if(callback) callback(error)
+                    }
+                    else{
+                        res();
+                        if(result.length !== 0 ) {
+                            if (callback) callback(result[0]._id);
+                            resolve(result[0]._id);
+                        }
+                        else {
+                            if(callback) callback(0);     //converted back to int
+                            resolve(0);
+                        }
+                    }
+                });
+            });
+        })
+    }
+    static searchDebtors(filter, keyword, rows, skip, sort, max, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                filter = {
+                    ...filter, 
+                    $or : [
+                        {"myProfile.lastName" : new RegExp(".*" + keyword + ".*", "i")},
+                        {"myProfile.firstName" : new RegExp(".*" + keyword + ".*", "i")},
+                        {"myProfile.middleName" : new RegExp(".*" + keyword + ".*", "i")}
+                    ]
+                };
+                client.collection(this.name).aggregate(
+                    this.getDebtorAggregateArray(filter)
+                ).sort(sort ? {[sort] : max ? -1 : 1} : {_id : -1}).
+                skip(skip).limit(rows).toArray((err, result)=>{ 
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "searchDebtors";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
+            });
+        })
+    }
+    static getSearchDebtorMinMaxIds(filter, keyword, sort, max, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                filter = {
+                    ...filter, 
+                    $or : [
+                        {"myProfile.lastName" : new RegExp(".*" + keyword + ".*", "i")},
+                        {"myProfile.firstName" : new RegExp(".*" + keyword + ".*", "i")},
+                        {"myProfile.middleName" : new RegExp(".*" + keyword + ".*", "i")}
+                    ]
+                };
+                client.collection(this.name).aggregate(
+                    this.getDebtorAggregateArray(filter)
+                ).sort(sort ? {[sort] : max ? -1 : 1 } : {_id: max ? -1 : 1})
+                .limit(1).toArray((err, result)=>{
+                    if(err) {
+                        rej(err)
+                        const error = errMsg + "getSearchDebtorMinMaxIds";
+                        reject(error);
+                        if(callback) callback(error)
+                    }
+                    else{
+                        res();
+                        if(result.length !== 0 ) {
+                            if (callback) callback(result[0]._id);
+                            resolve(result[0]._id);
+                        }
+                        else {
+                            if(callback) callback(0);     //converted back to int
+                            resolve(0);
+                        }
+                    }
+                });
+            });
+        })
+    }
+    static getDebtorAggregateArray(match){
+        const aggregateArray =  [
+            {
+                $match : match,
+            }
+        ]
+        return aggregateArray;
+    }
+
+
     static removeFamilyId(patientId, callback){
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{
@@ -341,7 +466,7 @@ module.exports = class patients {
     }
     static searchPatient(keyword,rows, skip, sort, max, callback){
         return new Promise((resolve, reject)=>{
-            structure.db.hms((client, res, rej)=>{
+            structure.db.hms(async (client, res, rej)=>{
                 const collection = client.collection(this.name);
                 const response = (err, result)=>{
                     if(err){
@@ -357,12 +482,36 @@ module.exports = class patients {
                 }
                 if(isNaN(Number(keyword))){
                     const reValue = new RegExp(".*"+keyword+".*", "i");
+                    let match = {$or : [
+                        {"myProfile.lastName" : {"$regex" : reValue}},
+                        {"myProfile.firstName" : {"$regex" : reValue}},
+                        {"myProfile.middleName" : {"$regex" : reValue}}
+                    ]};
+                    const clinicSettings = await settings.getSettings({name : "clinics"}),
+                    clinicSetting = clinicSettings && clinicSettings[0];
+                    if(clinicSetting && clinicSetting.values){
+                        const clinics = clinicSetting.values;
+                        if(clinics){
+                            const prefixes = clinics.map(i=>i.prefix);
+                            for (let i = 0; i < prefixes.length; i++) {
+                                const prefix = prefixes[i];
+                                if(String(keyword).toLowerCase().includes(String(prefix).toLowerCase())){
+                                    let clinicNumber = String(keyword).toLowerCase().substr(prefix.length);
+                                    if(!isNaN(clinicNumber = parseInt(clinicNumber))){
+                                        match.$or.push({
+                                            $and : [
+                                                {"clinics.prefix" : {$regex : new RegExp(".*"+prefix+".*", "i")}},
+                                                {"clinics.code" : clinicNumber},
+                                            ]
+                                        }); break;
+                                    }
+
+                                }
+                            }
+                        }
+                    }
                     collection.find(
-                        {$or : [
-                            {"myProfile.lastName" : {"$regex" : reValue}},
-                            {"myProfile.firstName" : {"$regex" : reValue}},
-                            {"myProfile.middleName" : {"$regex" : reValue}}
-                        ]}
+                        match
                     ).
                     // sort(sort ? {_id : max ? -1 : 1} : {_id : -1}).
                     sort({"myProfile.lastName" : 1}).
