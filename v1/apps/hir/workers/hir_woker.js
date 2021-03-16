@@ -207,13 +207,14 @@ module.exports = class hirWorker {
             const patient = await m_patients.getAPatient(patientId);
             if(!patient) throw new Error("No patient associated with this debt");
             const {credit, debt} = patient;
+            console.log(credit, debt, patientId)
             if(!credit) throw new Error("Insufficient fund");
             let result;
-            if(credit > debt) result = await m_patients.updatePatientQuery(
+            if(!debt) throw new Error("No debt exits!")
+            else if(credit > debt) result = await m_patients.updatePatientQuery(
                     {_id : patientId},
                     {
-                        $set : {credit : credit - debt},
-                        $unset : {debt : true}
+                        $set : {credit : credit - debt, debt : 0}
                     }
                 );
             else result = await m_patients.updatePatientQuery(
@@ -356,7 +357,7 @@ module.exports = class hirWorker {
             {credit} = patient || {};
             if(!deposit) throw new Error("Deposit not found!");
             else if (!patient) throw new Error("Patient not found!");
-            else if(amount > credit) throw new Error("Sorry you can't delete this deposit, it has been used or refunded!")
+            else if(!credit || amount > credit) throw new Error("Sorry you can't delete this deposit, it has been used or refunded!")
             await m_patients.updatePatientQuery(
                 {_id : patientId},
                 {$inc : {credit : -amount}}
@@ -685,6 +686,29 @@ module.exports = class hirWorker {
                         {_id : patientId},
                         {$inc : {credit : amount}}
                     );
+                }else if(accountAction === generalInfo.accountAction.addToDebt){
+                    const patient = await m_patients.getAPatient(patientId);
+                    if(!patient) throw new Error("Patient not seen");
+                    const {debt} = patient;
+                    if(debt && debt >= amount){
+                        await m_patients.updatePatientQuery(
+                            {_id : patientId},
+                            {$inc : {debt : -amount}}
+                        );
+                    }else if(!debt) {
+                        await m_patients.updatePatientQuery(
+                            {_id : patientId},
+                            {$inc : {credit : amount}}
+                        );
+                    }else if(debt && debt < amount){
+                        //some part of this debt have been paid
+                        const credit = amount - debt;
+                        await m_patients.updatePatientQuery(
+                            {_id : patientId},
+                            {$inc : {credit}},
+                            {$set : {debt : 0}}
+                        )
+                    }
                 }
             }
             if(groupId !== 'undefined' && groupId !== "null"){
