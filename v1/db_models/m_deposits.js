@@ -5,6 +5,28 @@ const myUtils = require("../../utils/Utils");
 const Utils = require("../../utils/Utils");
 let errMsg = "DB Error! ";
 module.exports = class deposits {
+    static deleteDepositFromDate(patientId, startDate, filter={}, callback){
+        return new Promise((resolve, reject) => {
+            structure.db.hms((client, res, rej) => {
+                client.collection(this.name).deleteMany({
+                    patientId,
+                    actionDate : {$gte : new Date(startDate)},
+                    ...filter
+                }, (err, result) => {
+                    if(err){
+                        rej(err);
+                        const error = new Error(errMsg, + "deleteDepositFromDate");
+                        if(callback) callback(error);
+                        else reject(error);
+                    }else{
+                        res();
+                        if(callback) callback(result.result);
+                        else resolve(result.result);
+                    }
+                })
+            })
+        })
+    }
     static getDepositGroup(filter, group, callback) {
         return new Promise((resolve, reject) => {
             structure.db.hms((client, res, rej)=>{

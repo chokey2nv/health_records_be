@@ -9,10 +9,10 @@ const assert = require('assert');
 // Connection URL
 const url = process.env.MONGODB_URI || process.env.MY_DB_URI;
 // Database Name
-const host = 'localhost';
+const host = '127.0.0.1';
 const port = 27017;
 const database = "hms";
-
+const connUrl = `mongodb://${host}:${port}`
 //mongodb://chokey2nv:password123@ds149732.mlab.com:49732/agroblog
 
 
@@ -94,5 +94,6 @@ var autoIncrement = function(collectionClient, callback){
 
 
 module.exports = {
-    globalDbConnection, hms, ObjectId, autoIncrement
+    globalDbConnection, hms, ObjectId, autoIncrement,
+    dbHost: host, dbPort: port, dbUrl: connUrl
 }

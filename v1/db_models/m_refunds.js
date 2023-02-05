@@ -5,6 +5,86 @@ const myUtils = require("../../utils/Utils");
 const Utils = require("../../utils/Utils");
 let errMsg = "DB Error! ";
 module.exports = class refunds {
+    static deleteRefundFromDate(patientId, startDate, filter={}, callback){
+        return new Promise((resolve, reject) => {
+            structure.db.hms((client, res, rej) => {
+                client.collection(this.name).deleteMany({
+                    patientId,
+                    actionDate : {$gte : new Date(startDate)},
+                    ...filter
+                }, (err, result) => {
+                    if(err){
+                        rej(err);
+                        const error = new Error(errMsg, + "deleteRefundFromDate");
+                        if(callback) callback(error);
+                        else reject(error);
+                    }else{
+                        res();
+                        if(callback) callback(result.result);
+                        else resolve(result.result);
+                    }
+                })
+            })
+        })
+    }
+    static getRefundByGroup(filter, group, callback){
+        return new Promise((resolve, reject)=>{
+            structure.db.hms((client, res, rej)=>{
+                const {startDate, endDate, date, ..._filter} = filter;
+                let match = {..._filter};
+                if(startDate){
+                    if(!startDate) throw("No start date found");
+                    else if(!endDate) throw("No end date fount");
+                    match = {
+                        ...filter, $and : [
+                        {actionDate : {$gte : myUtils.getStandardFromLocale(new Date(startDate).toLocaleDateString())} }, 
+                        {actionDate : {$lte : myUtils.getStandardFromLocale(new Date(endDate).toLocaleDateString())} }, 
+                    ]}
+                }else if(date){
+                    const _date = new Date(date);
+                    match = {
+                        ...match,
+                        year : _date.getFullYear(), 
+                    };
+                    if(!match.yearOnly){
+                        match.month = _date.getMonth() + 1;
+                        if(!match.monthOnly) match.day = _date.getDate();
+                    }
+                    delete match.monthOnly; delete match.yearOnly;
+                }
+                const collection = client.collection(this.name);
+                collection.aggregate([ 
+                    {
+                        $addFields : {
+                            year : {$year : "$actionDate"},
+                            month : {$month : "$actionDate"},
+                            day : {$dayOfMonth : "$actionDate"},
+                        },
+                    },{
+                        $match : match
+                    },
+                    { 
+                        $group :  group ? group :
+                        { 
+                            _id : null, 
+                            amount : {$sum : "$credit"}, 
+                        } 
+                    }
+                ]).toArray((err, result)=>{
+                    if(err){
+                        rej(err);
+                        const error = errMsg + "getRefundByGroup";
+                        reject(error);
+                        if(callback) callback(error);
+                    }else{
+                        res();
+                        resolve(result);
+                        if(callback) callback(err, result);
+                    }
+                })
+            })
+        });
+    }
     static deleteRefund(refundId, callback){
         return new Promise((resolve, reject)=>{
             structure.db.hms((client, res, rej)=>{

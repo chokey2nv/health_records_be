@@ -5,6 +5,8 @@ module.exports = function(req, res){
     const {action} = req.params;
     console.log("ACTION", action);
     switch(action){
+        case "deletePaymentDetailFromDate" : 
+            return hirWorker.deletePaymentDetailFromDate(req.query, req.body, result => res.send(result));
         case "createClinicPatient" : 
             return hirWorker.createClinicPatient(req.query, req.body, result => res.send(result));
 
@@ -19,6 +21,8 @@ module.exports = function(req, res){
         case "getSearchRefundMinMaxIds" :
             return hirWorker.getSearchRefundMinMaxIds(req.query, req.body, result=>res.send(result));
         
+        case "getRefundByGroup" : 
+            return hirWorker.getRefundByGroup(req.query, req.body, result=>res.send(result));
         case "refundCredit" : 
             return hirWorker.refundCredit(req.query, req.body, result=>res.send(result));
         case "getDebtHxs" :

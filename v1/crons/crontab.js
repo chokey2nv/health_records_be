@@ -1,8 +1,9 @@
-const path = require('path');
+const backup = require('./scripts/backup');
+
 module.exports = [
     {
         name : "expire_subs", 
-        schedule : "0 0 0 * * *", 
-        command : "node " + path.join(__dirname, "scripts", "backup.bat")
+        schedule : "* 0 18 * * * *", 
+        command : backup
     }
 ]

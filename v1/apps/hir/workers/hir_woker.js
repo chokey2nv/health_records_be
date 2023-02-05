@@ -39,6 +39,29 @@ module.exports = class hirWorker {
         return false;
     }
 
+    async deletePaymentDetailFromDate(query, body, callback) { console.log(body)
+        const {userId} = query,
+        {patientId, startDate, filter, credit, debt} = body;
+        try{
+            //TO DO
+            //this payment deletion should include payment groups
+            const patient = await m_patients.getAPatient(patientId);
+            if(!patient) throw Error("Patient not seen! confirm patient Id");
+            await m_patients.updatePatientQuery(
+                {_id : patientId},
+                {$set : {credit : credit || 0, debt : debt || 0}}
+            );
+            const result = {};
+            result["payment"] = await m_payments.deletePaymentFromDate(patientId, startDate, filter);
+            console.log("after payment")
+            result["deposit"] = await m_deposits.deleteDepositFromDate(patientId, startDate, filter);
+            result["refund"] = await m_refunds.deleteRefundFromDate(patientId, startDate, filter);
+            result["debt_hx"] = await m_debt_hx.deleteDebtHxromDate(patientId, startDate, filter);
+            callback({deletePaymentDetailFromDate : true, result : {}, message : success});
+        }catch({message}){
+            callback({deletePaymentDetailFromDate : false, message});
+        }
+    }
     async createClinicPatient(query, body, callback) {
         const {userId} = query,
         {data} = body;
@@ -68,6 +91,16 @@ module.exports = class hirWorker {
         }catch(message){
             console.error(message); 
             callback({createClinicPatient : false, message : message.message || message});
+        }
+    }
+    async getRefundByGroup(query, body, callback) {
+        const {userId} = query,
+        {filter, group} = body;
+        try{
+            const result = await m_refunds.getRefundByGroup(filter, group);
+            callback({getRefundByGroup : true, result, message : success});
+        }catch({message}){
+            callback({getRefundByGroup : false, messgae})
         }
     }
     async revertRefund(query, callback) {
