@@ -12,7 +12,7 @@ function deletePreviousExceptOne(backupPath) {
     .readdirSync(backupPath)
     .filter((item) => ![".", ".."].includes(item))
     .sort((a, b) => {
-      return a.split("-")[2]?.localeCompare(b.split("-")[2]);
+      return a.split("-")[2].localeCompare(b.split("-")[2]);
     });
   if (folderList.length > 2) {
     for (let index = 0; index < folderList.length - 2; index++) {

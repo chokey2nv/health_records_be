@@ -47,7 +47,7 @@
         "babel-preset-react": "^6.24.1",
         "babel-preset-stage-2": "^6.24.1",
         "nexe": "^3.3.2",
-        "nodemon": "^1.18.7"
+        "nodemon": "^1.19.4"
     },
     "engines": {
         "node": "10.14.1",
