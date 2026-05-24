@@ -23,7 +23,7 @@ app.use(cors());
 app.use((req, res, next)=>{
     req.query.userId = parseInt(req.query.userId);
     console.log({ req });
-    if(req.params.action === "login" /* || hirWorker.verifyToken(req.query) */)
+    if(req.params.action === "login" || hirWorker.verifyToken(req.query))
         next();
     else res.send({[req.params.action] : false, message : "Access denied"});
 })
