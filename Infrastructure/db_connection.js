@@ -7,7 +7,7 @@ const assert = require('assert');
 
 //heroku step 2
 // Connection URL
-const url = process.env.MONGODB_URI || process.env.MY_DB_URI;
+const url = process.env.MONGODB_URI || process.env.MY_DB_URI || "mongodb://localhost:27017"
 // Database Name
 const host = '127.0.0.1';
 const port = 27017;
@@ -17,7 +17,7 @@ const connUrl = `mongodb://${host}:${port}`
 
 
 var globalDbConnection;
-if(process.env.MONGODB_URI){
+if(url){
     globalDbConnection = function(url){ 
         return function(database, callback){
             // var mongocl = new MongoClient(new Server(host, port));

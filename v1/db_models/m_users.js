@@ -172,7 +172,7 @@ module.exports = class users {
                 const collection = client.collection(this.name);
                 data._id =  await structure.db.autoIncrement(collection);
                 const {password} = data.myProfile;
-                data.myProfile.password = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+                data.myProfile.password = bcrypt.hashSync(password, 10);
                 collection.insertOne(data, (err, result)=>{ 
                     if(err){
                         const message = "Error signin up, try again later!";

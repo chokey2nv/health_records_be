@@ -3,6 +3,7 @@ var bodyParser = require('body-parser');
 var webHandler = require('./handler');
 var hirWorker = require("./v1/apps/hir/workers/hir_woker");
 const cronJobs = require('./v1/crons/cron_jobs');
+const appInit = require('./v1/defaults/init');
 
 var cors = require("cors");
 const path = require("path");
@@ -13,13 +14,16 @@ var app = express();
 var jsonParser = bodyParser.json();
 var urlencodedParser = bodyParser.urlencoded({ extended: false });
 
+appInit();
+
 //heroku step one
 const PORT = process.env.PORT || 8003;
 
 app.use(cors());
 app.use((req, res, next)=>{
     req.query.userId = parseInt(req.query.userId);
-    if(req.params.action === "login" || hirWorker.verifyToken(req.query))
+    console.log({ req });
+    if(req.params.action === "login" /* || hirWorker.verifyToken(req.query) */)
         next();
     else res.send({[req.params.action] : false, message : "Access denied"});
 })
