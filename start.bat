@@ -11,7 +11,7 @@
 @REM start chrome http://192.168.0.10:8003/
 
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 :: -------------------------------------------------
 :: Run as Administrator
@@ -27,44 +27,64 @@ if %errorLevel% neq 0 (
 :: -------------------------------------------------
 cd /d "%~dp0"
 
-echo Starting services...
+echo =====================================
+echo Starting HMS Environment
+echo =====================================
 
 :: -------------------------------------------------
-:: Check if MongoDB is already running
+:: MongoDB
 :: -------------------------------------------------
 tasklist /FI "IMAGENAME eq mongod.exe" 2>NUL | find /I "mongod.exe" >NUL
 
 if %errorLevel% neq 0 (
-    echo MongoDB not running. Starting MongoDB...
-    
-    :: Update this path if needed
-    start "" /B "C:\Program Files\MongoDB\Server\8.0\bin\mongod.exe"
+
+    echo Starting MongoDB...
+
+    :: CHANGE THIS TO YOUR REAL DB PATH
+    set MONGO_DBPATH=C:\data\db
+
+    start "MongoDB" cmd /k ^
+    ""C:\Program Files\MongoDB\Server\8.0\bin\mongod.exe" --dbpath "!MONGO_DBPATH!""
+
 ) else (
     echo MongoDB already running.
 )
 
 :: -------------------------------------------------
-:: Start PM2 app safely
-:: -------------------------------------------------
-pm2 describe hms >nul 2>&1
-
-if %errorLevel% neq 0 (
-    echo Starting HMS server...
-    pm2 start server.js --name hms
-) else (
-    echo HMS already running. Restarting...
-    pm2 restart hms
-)
-
-:: -------------------------------------------------
-:: Small delay for boot
+:: Wait a bit
 :: -------------------------------------------------
 timeout /t 3 /nobreak >nul
 
 :: -------------------------------------------------
-:: Launch browser
+:: PM2
 :: -------------------------------------------------
+where pm2 >nul 2>&1
+
+if %errorLevel% neq 0 (
+    echo PM2 not found in PATH.
+    pause
+    exit /b
+)
+
+pm2 describe hms >nul 2>&1
+
+if %errorLevel% equ 0 (
+    echo Restarting HMS...
+    pm2 restart hms
+) else (
+    echo Starting HMS...
+    pm2 start server.js --name hms
+)
+
+:: -------------------------------------------------
+:: Open Browser
+:: -------------------------------------------------
+timeout /t 2 /nobreak >nul
+
 start "" chrome "http://192.168.0.10:8003/"
 
-echo Done.
-exit /b
+echo =====================================
+echo All services started successfully.
+echo =====================================
+
+pause
